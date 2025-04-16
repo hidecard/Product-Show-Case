@@ -54,7 +54,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script>
-    const API_URL = 'https://script.google.com/macros/s/AKfycbxZkRFhnOD5H0krN-BR1eFtARf-KFiMV1-U4_3OXvwVSO8ZBJoufQ6Gw8zryBuBT73Ysw/exec';
+    const API_URL = 'https://script.google.com/macros/s/AKfycbz-ih4gpUxfBS71m_ivJzgvDLLbwAEK57q4eJkYFZ5XiWlfS5vbxMgx5HBmExL4Wf4qeg/exec';
     const EMAILJS_SERVICE_ID = 'service_kgdq7l8';
     const EMAILJS_TEMPLATE_ID = 'template_3y09pde';
     const EMAILJS_PUBLIC_KEY = 'WPbZIBEI488f9L7Mr';
@@ -73,7 +73,12 @@
     }
 
     window.handleProducts = function(products) {
+      if (!products || products.status === 'error') {
+        document.getElementById('product-container').innerHTML = '<p class="text-danger">Error loading products: ' + (products?.error || 'Unknown error') + '</p>';
+        return;
+      }
       const container = document.getElementById('product-container');
+      container.innerHTML = ''; // Clear existing content
       products.forEach(product => {
         const card = `
           <div class="col-md-4 mb-4">
@@ -117,11 +122,16 @@
       // Save order to Google Sheets
       fetch(API_URL, {
         method: 'POST',
+        mode: 'cors',
         body: JSON.stringify(orderData),
         headers: { 'Content-Type': 'application/json' }
       })
       .then(response => {
-        if (!response.ok) throw new Error('Failed to save order');
+        if (!response.ok) {
+          return response.text().then(text => {
+            throw new Error(`HTTP error! Status: ${response.status}, Message: ${text}`);
+          });
+        }
         return response.json();
       })
       .then(result => {
@@ -138,13 +148,21 @@
             document.getElementById('orderForm').reset();
             bootstrap.Modal.getInstance(document.getElementById('orderModal')).hide();
           })
-          .catch(error => alert('Failed to send email: ' + error.message));
+          .catch(error => {
+            console.error('EmailJS error:', error);
+            alert('Order saved, but failed to send email: ' + error.message);
+          });
         } else {
-          alert('Failed to save order: ' + result.error);
+          throw new Error(result.error || 'Unknown error from server');
         }
       })
-      .catch(error => alert('Error: ' + error.message))
-      .finally(() => submitButton.disabled = false);
+      .catch(error => {
+        console.error('Fetch error:', error);
+        alert(`Failed to submit order: ${error.message}. Please check your network or try again later.`);
+      })
+      .finally(() => {
+        submitButton.disabled = false;
+      });
     });
   </script>
 </body>
